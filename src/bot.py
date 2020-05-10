@@ -8,11 +8,8 @@ import time
 import telebot
 
 # Testa prestatu
-
 parser = ArgumentParser(description='Test the Chit Chat system')
-
 parser.add_argument('-decoding_strategy', type=str, default='top1', choices=['top1', 'topk', 'multinomial']) 
-
 args = parser.parse_args()
 
 # Dekodetzea
@@ -45,28 +42,11 @@ def evaluate(sentence):
         output_sentence = output_sentence + ' ' + word
   return output_sentence
 
-def evaluate2(sentence):
-  with torch.no_grad():
-    sentence = '<sos> ' + sentence + ' <eos>'
-    sent_len = len(sentence.split())
-    sentence = torch.Tensor([text_fielden.vocab.stoi[i] for i in sentence.lower().split()]).long().view(sent_len, 1)
-    target = torch.Tensor([text_fielden.vocab.stoi['<sos>']]).long()
-    output_sentence = ''
-    encoder_outputs, hidden = modelen.encoder(sentence)
-    for t in range(MAX_LENGTH):
-    # first input to the decoder is the <sos> token
-      output, hidden = modelen.decoder(target, hidden, encoder_outputs)
-      target = decode(output, decoding_strategy)
-      word = text_fielden.vocab.itos[target.numpy()[0]]
-      if word == '<eos>':
-        return output_sentence
-      else:
-        output_sentence = output_sentence + ' ' + word
-  return output_sentence
 
-#Load model and fields
-text_field = torch.load('../modeleu/text_field.Field')
-model = torch.load('../modeleu/model.pt', map_location=torch.device('cpu'))
+# Load model and fields
+# Hizkuntza bakoitzerako bat, ingeleserako eta euskararako
+text_fieldeu = torch.load('../modeleu/text_field.Field')
+modeleu = torch.load('../modeleu/model.pt', map_location=torch.device('cpu'))
 text_fielden = torch.load('../model/text_field.Field')
 modelen = torch.load('../model/model.pt', map_location=torch.device('cpu'))
 torch.nn.Module.dump_patches = True
@@ -74,17 +54,14 @@ MAX_LENGTH = 10
 
 
 #Main system loop
-model.eval()
+modeleu.eval()
 modelen.eval()
 decoding_strategy = args.decoding_strategy
 
-hizkuntza = "eu"
-
-def erantzun(message):
-    if hizkuntza=="eu":
-        return evaluate(' '.join(_basic_english_normalize(message.text)))
-    else:
-        return evaluate2(' '.join(_basic_english_normalize(message.text)))
+# Hasierako hizkuntza euskara da
+hizkuntza = "euskara"
+model = modeleu
+text_field = text_fieldeu
 
 
 TOKEN = ""
@@ -93,6 +70,9 @@ bot = telebot.TeleBot(token=TOKEN)
 @bot.message_handler(commands=['start']) # Ongi etorri mezua
 def send_welcome(message):
     bot.reply_to(message, 'Ongi etorri!')
+    bot.send_message(chat_id=message.chat.id, text="Ongi etorri!")
+    reply = "Hizkuntza aukeratzeko:\n /1 Euskara \n /2 Ingelesa "
+    bot.send_message(chat_id=message.chat.id, text=reply)
 
 @bot.message_handler(commands=['help']) # Laguntza
 def send_welcome(message):
@@ -101,25 +81,32 @@ def send_welcome(message):
 
 @bot.message_handler(commands=['1']) # Euskara aukeraketa
 def send_welcome(message):
+    global hizkuntza, model, text_field, modeleu, text_fieldeu
+    model = modeleu
+    text_field = text_fieldeu
     bot.reply_to(message, 'Euskara aukeratuta')
-    hizkuntza ="eu"
+    hizkuntza ="euskara"
 
-@bot.message_handler(commands=['2']) # Ingelesa aukeraketa
+@bot.message_handler(commands=['2']) # Ingeles aukeraketa
 def send_welcome(message):
+    global hizkuntza, model, text_field, modelen, text_fielden
+    model = modelen
+    text_field = text_fielden
     bot.reply_to(message, 'Ingelesa aukeratuta')
-    hizkuntza="en"
+    hizkuntza="ingelesa"
 
 
-@bot.message_handler(func=lambda msg: msg.text is not None)
+@bot.message_handler(func=lambda  msg: msg.text is not None) # Solasaldia
 def talk(message):
-    if hizkuntza=="eu":
-        print("sartuta")
-        sentence = evaluate(' '.join(_basic_english_normalize(message.text)))
-    else:
-        sentence = evaluate2(' '.join(_basic_english_normalize(message.text)))
-    print('-' + sentence.strip().capitalize())
+    global hizkuntza
+    sentence = evaluate(' '.join(_basic_english_normalize(message.text)))
     reply = sentence.strip().capitalize()
-    bot.send_message(chat_id=message.chat.id, text=reply)
+    if "<unk>" not in reply:
+        bot.send_message(chat_id=message.chat.id, text=reply)
+    else:
+        bot.send_message(chat_id=message.chat.id, text="Ez dago erantzun egokirik. Gogoratu hizkuntza " + hizkuntza + "dela!")
+        bot.send_message(chat_id=message.chat.id, text="Hizkuntza aukeratzeko:\n /1 Euskara \n /2 Ingelesa ")
+
 
 while True:
     try:
