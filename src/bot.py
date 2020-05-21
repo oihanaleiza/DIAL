@@ -43,6 +43,23 @@ def evaluate(sentence):
   return output_sentence
 
 
+# Erantzunen garbiketa sinplea
+def garbiketa(esaldia):
+
+    esaldia = esaldia.replace(" ' ","'")
+    if esaldia.endswith(" ,") or esaldia.endswith(" .") or esaldia.endswith(" '"):
+      esaldia=esaldia[:-2]
+      esaldia=esaldia+"."
+    elif esaldia.endswith(" !"):
+      esaldia=esaldia[:-2]
+      esaldia=esaldia+"!"
+    elif esaldia.endswith(" ?"):
+      esaldia=esaldia[:-2]
+      esaldia=esaldia+"?"
+    
+    return esaldia
+
+
 # Load model and fields
 # Hizkuntza bakoitzerako bat, ingeleserako eta euskararako
 text_fieldeu = torch.load('../modeleu/text_field.Field')
@@ -64,14 +81,13 @@ model = modeleu
 text_field = text_fieldeu
 
 
-TOKEN = ""
+TOKEN = "Hemen idatzi norberaren tokena"
 bot = telebot.TeleBot(token=TOKEN)
 
 @bot.message_handler(commands=['start']) # Ongi etorri mezua
 def send_welcome(message):
-    bot.reply_to(message, 'Ongi etorri!')
     bot.send_message(chat_id=message.chat.id, text="Ongi etorri!")
-    reply = "Hizkuntza aukeratzeko:\n /1 Euskara \n /2 Ingelesa "
+    reply = "Hizkuntza aukeratzeko:\n /1 Euskara \n /2 Ingelesa \n (Defektuzko hizkuntza euskara da)"
     bot.send_message(chat_id=message.chat.id, text=reply)
 
 @bot.message_handler(commands=['help']) # Laguntza
@@ -100,11 +116,12 @@ def send_welcome(message):
 def talk(message):
     global hizkuntza
     sentence = evaluate(' '.join(_basic_english_normalize(message.text)))
+    sentence = garbiketa(sentence)
     reply = sentence.strip().capitalize()
     if "<unk>" not in reply:
         bot.send_message(chat_id=message.chat.id, text=reply)
     else:
-        bot.send_message(chat_id=message.chat.id, text="Ez dago erantzun egokirik. Gogoratu hizkuntza " + hizkuntza + "dela!")
+        bot.send_message(chat_id=message.chat.id, text="Ez dago erantzun egokirik. Gogoratu hizkuntza " + hizkuntza + " dela!")
         bot.send_message(chat_id=message.chat.id, text="Hizkuntza aukeratzeko:\n /1 Euskara \n /2 Ingelesa ")
 
 
